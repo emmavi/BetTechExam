@@ -1,42 +1,6 @@
-# Wallet Session Startup Specification
+# Delta for Wallet Session Startup
 
-## Purpose
-
-Define the first runnable wallet session slice: startup wallet creation, initial balance display, a minimal console input loop, exit handling, and unknown-command handling.
-
-## Requirements
-
-### Requirement: Startup Wallet Balance
-
-The system MUST create a new session wallet whose initial balance is `$0`.
-
-#### Scenario: New wallet starts at zero
-
-- GIVEN the application is starting a new session
-- WHEN the session wallet is created
-- THEN the wallet balance MUST be `$0`
-
-#### Scenario: Startup balance is not hardcoded separately
-
-- GIVEN a session wallet has been created
-- WHEN startup output is produced
-- THEN the displayed balance MUST come from the wallet's current balance
-
-### Requirement: Startup Balance Display
-
-The system MUST display the newly created wallet's actual balance before accepting commands.
-
-#### Scenario: Startup displays zero balance
-
-- GIVEN a new session wallet with balance `$0`
-- WHEN the application starts
-- THEN the console output MUST include the current balance as `$0`
-
-#### Scenario: Startup display occurs before first prompt input
-
-- GIVEN the application has started
-- WHEN no user command has been read yet
-- THEN the startup balance MUST already have been displayed
+## MODIFIED Requirements
 
 ### Requirement: Minimal Console Loop
 

@@ -43,7 +43,7 @@ public class CommandParserRegistryTests
         var registry = new CommandParserRegistry([new ExitCommandParser()]);
 
         // Act
-        var result = registry.Parse("deposit 10");
+        var result = registry.Parse("bet 5");
 
         // Assert
         result.IsFailure.Should().BeTrue();

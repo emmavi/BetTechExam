@@ -42,7 +42,7 @@ public class SessionRunnerTests
     public void Run_UnknownCommand_PrintsUnknownAndContinues()
     {
         // Arrange
-        var console = new FakeConsole("deposit 10", "exit");
+        var console = new FakeConsole("bet 5", "exit");
 
         // Act
         Program.Run(console);
@@ -72,6 +72,107 @@ public class SessionRunnerTests
             "Please enter a command:",
             "Thank you for playing! Hope to see you again soon."
         );
+    }
+
+    [Fact]
+    public void Run_DepositSuccess_UpdatesBalanceAndContinues()
+    {
+        // Arrange
+        var console = new FakeConsole("deposit 10", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Welcome to BetBetBet!",
+            "Your current balance is: $0",
+            "Please enter a command:",
+            "Your deposit of $10 was successful. Your current balance is: $10",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().NotContain("Unknown command.");
+    }
+
+    [Fact]
+    public void Run_AccumulatedDecimalDeposits_UpdatesBalanceToTotalAndContinues()
+    {
+        // Arrange
+        var console = new FakeConsole("deposit 10", "deposit 10.50", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Welcome to BetBetBet!",
+            "Your current balance is: $0",
+            "Please enter a command:",
+            "Your deposit of $10 was successful. Your current balance is: $10",
+            "Please enter a command:",
+            "Your deposit of $10.50 was successful. Your current balance is: $20.50",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().NotContain("Unknown command.");
+    }
+
+    [Fact]
+    public void Run_DepositInvalidAmount_PrintsErrorAndContinues()
+    {
+        // Arrange
+        var console = new FakeConsole("deposit abc", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Please enter a command:",
+            "Could not parse amount.",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().ContainSingle(o => o.StartsWith("Your current balance is:"));
+    }
+
+    [Fact]
+    public void Run_DepositZeroAmount_PrintsErrorAndContinues()
+    {
+        // Arrange
+        var console = new FakeConsole("deposit 0", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Please enter a command:",
+            "Deposit amount must be positive.",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().ContainSingle(o => o.StartsWith("Your current balance is:"));
+    }
+
+    [Fact]
+    public void Run_DepositMissingAmount_PrintsErrorAndContinues()
+    {
+        // Arrange
+        var console = new FakeConsole("deposit", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Please enter a command:",
+            "Could not parse amount.",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().ContainSingle(o => o.StartsWith("Your current balance is:"));
     }
 
     private sealed class FakeConsole : IConsole

@@ -9,4 +9,7 @@ public static class InputErrors
 
     public static readonly Error InvalidFormat =
         new("Input.InvalidFormat", "Could not parse amount.");
+
+    public static readonly Error DepositAmountMustBePositive =
+        new("Input.DepositAmountMustBePositive", "Deposit amount must be positive.");
 }
