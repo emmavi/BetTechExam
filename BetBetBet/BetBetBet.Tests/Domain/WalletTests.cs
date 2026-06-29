@@ -75,4 +75,51 @@ public class WalletTests
         moneyResult.IsFailure.Should().BeTrue();
         moneyResult.Error!.Code.Should().Be("Money.NegativeAmount");
     }
+
+    [Fact]
+    public void Withdraw_SufficientFunds_ReducesBalance()
+    {
+        // Arrange
+        var wallet = new Wallet(Money.Create(20).Value!);
+        var withdrawAmount = Money.Create(5).Value!;
+
+        // Act
+        var result = wallet.Withdraw(withdrawAmount);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Balance.Amount.Should().Be(15);
+    }
+
+    [Fact]
+    public void Withdraw_InsufficientFunds_ReturnsError()
+    {
+        // Arrange
+        var wallet = new Wallet(Money.Create(3).Value!);
+        var withdrawAmount = Money.Create(5).Value!;
+
+        // Act
+        var result = wallet.Withdraw(withdrawAmount);
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error!.Code.Should().Be("Wallet.InsufficientFunds");
+        result.Error!.Message.Should().Be("Insufficient funds for withdrawal. Your current balance is: $3.00");
+        wallet.Balance.Amount.Should().Be(3);
+    }
+
+    [Fact]
+    public void Withdraw_ExactBalance_Succeeds()
+    {
+        // Arrange
+        var wallet = new Wallet(Money.Create(10).Value!);
+        var withdrawAmount = Money.Create(10).Value!;
+
+        // Act
+        var result = wallet.Withdraw(withdrawAmount);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Balance.Amount.Should().Be(0);
+    }
 }

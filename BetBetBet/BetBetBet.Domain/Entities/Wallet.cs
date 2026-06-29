@@ -20,4 +20,12 @@ public sealed class Wallet
 
         return new Wallet(Balance + amount);
     }
+
+    public Result<Wallet> Withdraw(Money amount)
+    {
+        if (amount > Balance)
+            return WalletErrors.InsufficientFunds(Balance);
+
+        return new Wallet(Balance - amount);
+    }
 }

@@ -175,6 +175,73 @@ public class SessionRunnerTests
         console.Outputs.Should().ContainSingle(o => o.StartsWith("Your current balance is:"));
     }
 
+    [Fact]
+    public void Run_WithdrawSuccess_UpdatesBalance()
+    {
+        // Arrange
+        var console = new FakeConsole("deposit 20", "withdraw 5", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Welcome to BetBetBet!",
+            "Your current balance is: $0",
+            "Please enter a command:",
+            "Your deposit of $20 was successful. Your current balance is: $20",
+            "Please enter a command:",
+            "Your withdrawal of $5.00 was successful. Your current balance is: $15.00",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().NotContain("Unknown command.");
+    }
+
+    [Fact]
+    public void Run_WithdrawInsufficientFunds_PrintsErrorWithBalance()
+    {
+        // Arrange
+        var console = new FakeConsole("deposit 3", "withdraw 5", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Welcome to BetBetBet!",
+            "Your current balance is: $0",
+            "Please enter a command:",
+            "Your deposit of $3 was successful. Your current balance is: $3",
+            "Please enter a command:",
+            "Insufficient funds for withdrawal. Your current balance is: $3.00",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().NotContain("Unknown command.");
+    }
+
+    [Fact]
+    public void Run_WithdrawInvalidAmount_PrintsError()
+    {
+        // Arrange
+        var console = new FakeConsole("withdraw abc", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Welcome to BetBetBet!",
+            "Your current balance is: $0",
+            "Please enter a command:",
+            "Could not parse amount.",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().NotContain("Unknown command.");
+    }
+
     private sealed class FakeConsole : IConsole
     {
         private readonly Queue<string?> _inputs;

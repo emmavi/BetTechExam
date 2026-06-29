@@ -27,7 +27,7 @@ public static class Program
         var wallet = new Wallet(moneyResult.Value);
         console.WriteLine($"Your current balance is: ${wallet.Balance.Amount}");
 
-        var registry = new CommandParserRegistry([new ExitCommandParser(), new DepositCommandParser()]);
+        var registry = new CommandParserRegistry([new ExitCommandParser(), new DepositCommandParser(), new WithdrawCommandParser()]);
 
         while (true)
         {
@@ -57,6 +57,24 @@ public static class Program
                 {
                     wallet = result.Value!;
                     console.WriteLine($"Your deposit of ${depositCommand.Amount.Amount} was successful. Your current balance is: ${wallet.Balance.Amount}");
+                }
+                else
+                {
+                    console.WriteLine(result.Error!.Message);
+                }
+
+                continue;
+            }
+
+            if (parseResult.Value is WithdrawCommand withdrawCommand)
+            {
+                var handler = new WithdrawCommandHandler();
+                var result = handler.Handle(wallet, withdrawCommand);
+
+                if (result.IsSuccess)
+                {
+                    wallet = result.Value!;
+                    console.WriteLine($"Your withdrawal of ${withdrawCommand.Amount.Amount:F2} was successful. Your current balance is: ${wallet.Balance.Amount:F2}");
                 }
                 else
                 {
