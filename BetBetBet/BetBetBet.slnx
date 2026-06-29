@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/01. Preentation/">
+    <Project Path="BetBetBet.Presentation/BetBetBet.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/02. Application/">
+    <Project Path="BetBetBet.Application/BetBetBet.Application.csproj" />
+  </Folder>
+  <Folder Name="/03. Domain/">
+    <Project Path="BetBetBet.Domain/BetBetBet.Domain.csproj" />
+  </Folder>
+  <Folder Name="/04. Infrastructure/">
+    <Project Path="BetBetBet.Infra/BetBetBet.Infra.csproj" />
+  </Folder>
+  <Folder Name="/05. UnitTets/">
+    <Project Path="BetBetBet.Tests/BetBetBet.Tests.csproj" />
+  </Folder>
+</Solution>

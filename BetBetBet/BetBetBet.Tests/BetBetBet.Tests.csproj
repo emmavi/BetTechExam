@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BetBetBet.Application\BetBetBet.Application.csproj" />
+    <ProjectReference Include="..\BetBetBet.Domain\BetBetBet.Domain.csproj" />
+    <ProjectReference Include="..\BetBetBet.Infra\BetBetBet.Infra.csproj" />
+  </ItemGroup>
+
+</Project>

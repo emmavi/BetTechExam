@@ -1,0 +1,12 @@
+
+BetBetBet/.vs/
+
+**/bin/
+
+**/obj/
+
+.opencode/
+
+.atl/
+
+AGENTS.md
