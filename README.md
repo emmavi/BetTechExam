@@ -12,13 +12,13 @@ Console application in .NET that simulates a player wallet with deposit, withdra
 
 ## Architecture
 
-Clean Architecture with four projects. Dependencies point inward — outer layers know inner layers, never the reverse.
+Clean Architecture with four production projects plus a test project. Dependencies point inward — outer layers know inner layers, never the reverse.
 
 ```
 Presentation  ──▶  Application  ──▶  Domain
      │                                  ▲
      ▼                                  │
-   Infra ─────────────────────────────┘
+   Infra ───────────────────────────────┘
 ```
 
 ### Projects
@@ -26,17 +26,17 @@ Presentation  ──▶  Application  ──▶  Domain
 | Project | Responsibility | Knows about |
 |--------|----------------|-------------|
 | `BetBetBet.Domain` | Entities, value objects, domain services, business rules, error catalog | Nothing — pure C# |
-| `BetBetBet.Application` | Use cases, orchestration, command DTOs, dispatcher | Domain |
+| `BetBetBet.Application` | Use cases, orchestration, command DTOs, result DTOs | Domain |
 | `BetBetBet.Infra` | Concrete implementations of infrastructure abstractions (RNG, clock, etc.) | Domain |
 | `BetBetBet.Presentation` | Console loop, input/output, formatting | Application, Infra (composition root) |
-| `BetBetBet.Tests` | Unit and integration tests | All of the above |
+| `BetBetBet.Tests` | Unit tests, Presentation flow tests, and regression coverage | All of the above |
 
 ### Why this split
 
 - **Domain is the heart**: changing input format (console → REST → gRPC) doesn't touch business rules.
-- **Application orchestrates**: each use case is one handler — easy to extend (add `history`, `cashout`, etc.).
+- **Application orchestrates use cases**: each business action is one handler — easy to extend (add `history`, `cashout`, etc.).
 - **Infra is replaceable**: swap `System.Random` for a cryptographically secure RNG without touching domain.
-- **Tests target the right layer**: domain tests are fast and pure; application tests verify orchestration; integration tests exercise the full loop.
+- **Tests target the right layer**: domain tests are fast and pure; application tests verify orchestration; presentation tests exercise parsing, execution, formatting, and the full console loop.
 
 ---
 
@@ -163,28 +163,28 @@ public static class InputErrors
 
 ### Commands (input DTOs)
 
-Plain records — no behavior.
+Plain records — no behavior. Amount-bearing commands carry validated `Money` values, so handlers do not need to parse console strings or raw decimals.
 
 ```csharp
-public sealed record DepositCommand(decimal Amount);
-public sealed record WithdrawCommand(decimal Amount);
-public sealed record BetCommand(decimal Amount);
-public sealed record ExitCommand;
+public sealed record DepositCommand(Money Amount) : ICommand;
+public sealed record WithdrawCommand(Money Amount) : ICommand;
+public sealed record BetCommand(Money Amount) : ICommand;
+public sealed record ExitCommand : ICommand;
 ```
 
 ### Handlers (one per use case)
 
-Each handler takes a command and returns a `Result<T>`. Handlers are the only place that knows the sequence of domain calls for a use case.
+Each handler takes the current `Wallet` plus a command and returns a `Result<T>`. Handlers are the only place that knows the sequence of domain calls for a use case.
 
-- `DepositHandler`
-- `WithdrawHandler`
-- `BetHandler` — validates bet range, calls `IGameEngine.Play`, applies outcome to wallet
-- `ExitHandler` — signals loop termination
+- `DepositCommandHandler` — deposits money and returns the updated wallet
+- `WithdrawCommandHandler` — withdraws money and returns the updated wallet
+- `BetCommandHandler` — validates bet range, calls `IGameEngine.Play`, applies outcome, and returns a `BetResult`
+
+`ExitCommand` has no Application handler today because it is a console-loop concern handled in Presentation.
 
 ### Result types
 
 ```csharp
-public sealed record OperationResult(Money NewBalance);
 public sealed record BetResult(Money Bet, Money Win, Money NewBalance)
 {
     public bool IsWin => Win.Value > 0;
@@ -193,7 +193,9 @@ public sealed record BetResult(Money Bet, Money Win, Money NewBalance)
 
 ### Dispatching
 
-- **`ICommandDispatcher`** — routes a parsed command to the right handler. Simple mediator pattern, no MediatR dependency needed for this scope.
+There is currently no Application-level command dispatcher. Dispatch happens at the Presentation boundary through `CommandExecutorRegistry`, which maps parsed command types to console-specific executors.
+
+An Application-level dispatcher or mediator can be introduced later if another client needs to share the same dispatch policy.
 
 ---
 
@@ -206,17 +208,17 @@ public sealed record BetResult(Money Bet, Money Win, Money NewBalance)
 
 ## Presentation
 
-Owns everything tied to the console medium: reading raw input, parsing it into typed commands, formatting results for display. If we later swap the console for a REST API or a chat bot, only this layer changes — the Application layer remains untouched.
+Owns everything tied to the console medium: reading raw input, parsing it into typed commands, choosing the right console executor, and formatting results for display. If we later swap the console for a REST API or a chat bot, this layer changes — the Application and Domain layers remain focused on use cases and business rules.
 
 ### Console loop
 
-Reads input, parses, dispatches, formats result, prints. Runs until `ExitCommand` is dispatched.
+Reads input, parses it, executes it through a Presentation executor, applies the returned wallet state, and repeats until an executor signals exit.
 
 ### Command parsing
 
 Raw console strings are parsed into typed `ICommand` instances at this boundary. The syntax (`"deposit 10"`) is console-specific — an HTTP layer would deserialize JSON to the same command DTOs instead.
 
-**Design**: each command owns its own parser. The dispatcher uses a registry keyed by keyword. Adding a new command means adding a parser class and registering it — no changes to existing code (Open/Closed).
+**Design**: each command owns its own parser. The parser registry is keyed by keyword. Adding a new console command means adding a parser class and registering it.
 
 ```csharp
 public interface ICommandParser
@@ -267,10 +269,32 @@ public sealed class CommandParserRegistry
 
 **Rules enforced at this boundary:**
 - Case-insensitive keyword matching (`DEPOSIT 10` works).
-- Amounts must be a positive decimal (negative values are rejected per the task's "positive number" rule).
+- Parsed amount strings must be valid invariant-culture decimals.
 - Decimal parsing uses `CultureInfo.InvariantCulture` so `10.50` works regardless of locale.
 - Unknown keywords return `InputErrors.UnknownCommand`.
-- Malformed input returns `InputErrors.InvalidFormat`.
+- Malformed amount input returns `InputErrors.InvalidFormat`.
+- Business invalid amounts, such as zero deposits, are rejected by Domain/Application rules and printed as business error messages.
+
+### Command execution
+
+Parsed commands are executed by console-specific executors in `BetBetBet.Presentation.Commands`. The executor registry is keyed by command type:
+
+```csharp
+public interface ICommandExecutor
+{
+    Type CommandType { get; }
+    ExecutionResult Execute(ICommand command, Wallet wallet);
+}
+
+public sealed record ExecutionResult(Wallet? UpdatedWallet, bool ShouldExit = false);
+```
+
+- `DepositCommandExecutor` calls `DepositCommandHandler` and prints the deposit result.
+- `WithdrawCommandExecutor` calls `WithdrawCommandHandler` and prints the withdrawal result.
+- `BetCommandExecutor` calls `BetCommandHandler` and delegates win/loss text to `BetResultFormatter`.
+- `ExitCommandExecutor` prints the goodbye message and signals loop termination.
+
+This keeps `Program.Run` focused on loop orchestration instead of command-specific branching.
 
 ### Output formatting
 
@@ -282,7 +306,7 @@ Format strings match the task PDF exactly:
 - `Your withdrawal of $X.XX was successful. Your current balance is: $Y.YY`
 - `Thank you for playing! Hope to see you again soon.`
 
-Failures print the `Error.Message` from the failed `Result`. An `IResultFormatter` (or pattern matching on the result type) keeps formatting separate from the loop logic.
+Failures print the `Error.Message` from the failed `Result`. `BetResultFormatter` keeps bet-specific output formatting separate from the loop and executor wiring.
 
 ---
 
@@ -301,25 +325,21 @@ Failures print the `Error.Message` from the failed `Result`. An `IResultFormatte
 - `MoneyTests` — construction validation, equality, arithmetic, comparison.
 - `WalletTests` — deposit, withdraw with and without sufficient funds, invariants, decimal precision (e.g., the `$0.15` end state from the PDF example).
 - `BetRulesTests` — boundary cases at `$1`, `$10`, and outside.
-- `SlotGameEngineTests`:
-  - With mocked `IRandomProvider`, assert each tier:
-    - Random returns `0.3` → loss, `Win = 0`.
-    - Random returns `0.7` → win in `[bet, 2 * bet]`.
-    - Random returns `0.95` → win in `(2 * bet, 10 * bet]`.
-  - Statistical distribution test over N = 10,000 with real RNG and a fixed seed, tolerance ±2%.
+- `SlotGameEngineTests` — with mocked `IRandomProvider`, assert loss and win tiers deterministically.
 
 #### Application tests
 
-- `DepositHandlerTests`, `WithdrawHandlerTests`, `BetHandlerTests` — verify orchestration: correct domain calls, correct `Result` mapping.
+- `DepositCommandHandlerTests`, `WithdrawCommandHandlerTests`, `BetCommandHandlerTests` — verify orchestration and `Result` mapping.
 
 #### Presentation tests
 
 - `DepositCommandParserTests`, `WithdrawCommandParserTests`, `BetCommandParserTests`, `ExitCommandParserTests` — one test class per parser, `[Theory]` covering valid input, invalid formats, decimal amounts, negative amounts (rejected).
 - `CommandParserRegistryTests` — case-insensitive routing, unknown commands, empty input, whitespace handling.
+- `CommandExecutorRegistryTests` — type-based executor lookup and unknown command handling.
+- `DepositCommandExecutorTests`, `WithdrawCommandExecutorTests`, `BetCommandExecutorTests`, `ExitCommandExecutorTests` — verify console output, wallet updates, error printing, and exit signaling.
+- `SessionRunnerTests` — full console loop flows, including prompt ordering and representative deposit, withdrawal, betting, and exit scenarios.
 
-#### Integration tests
-
-- Run the full PDF example flow with a stubbed `IRandomProvider` that returns the values needed to reproduce the example sequence. Assert the final balance matches.
+There is no separate `Integration/` test folder today; full-loop coverage lives under Presentation tests.
 
 ### Conventions
 
@@ -344,19 +364,19 @@ BetBetBet/
 │   └── ...
 ├── BetBetBet.Application/
 │   ├── Commands/               # DepositCommand, WithdrawCommand, BetCommand, ExitCommand
-│   ├── Handlers/               # *Handler.cs
-│   ├── Results/                # OperationResult, BetResult
-│   └── Dispatching/            # ICommandDispatcher, CommandDispatcher
+│   ├── Handlers/               # *CommandHandler.cs
+│   └── Results/                # BetResult
 ├── BetBetBet.Infra/
 │   └── Random/                 # SystemRandomProvider
 ├── BetBetBet.Presentation/
 │   ├── Program.cs              # composition root + loop
 │   ├── Parsing/                # ICommandParser, CommandParserRegistry, *CommandParser
-│   └── Formatting/             # output formatters
+│   ├── Commands/               # ICommandExecutor, CommandExecutorRegistry, *CommandExecutor
+│   └── BetResultFormatter.cs   # betting output formatter
 └── BetBetBet.Tests/
     ├── Domain/
     ├── Application/
-    └── Integration/
+    └── Presentation/
 ```
 
 ---
@@ -364,7 +384,7 @@ BetBetBet/
 ## Design principles applied
 
 - **Single Responsibility** — one class, one reason to change.
-- **Open/Closed** — adding a new command means adding a handler, not modifying existing ones.
+- **Open/Closed** — adding a new console command means adding a command DTO, parser, executor, and handler where needed, instead of growing `Program.Run`.
 - **Dependency Inversion** — domain depends on abstractions (`IRandomProvider`, `IGameEngine`); infra provides implementations.
 - **Tell, don't ask** — `Wallet` mutates itself; callers don't read balance and recompute outside.
 - **Make illegal states unrepresentable** — `Money` cannot be negative; `Wallet` cannot have a negative balance.
