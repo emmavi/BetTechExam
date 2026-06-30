@@ -1,5 +1,6 @@
 using BetBetBet.Domain.Entities;
 using BetBetBet.Domain.Errors;
+using BetBetBet.Domain.Services;
 using BetBetBet.Domain.ValueObjects;
 using FluentAssertions;
 using Xunit;
@@ -117,6 +118,76 @@ public class WalletTests
 
         // Act
         var result = wallet.Withdraw(withdrawAmount);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Balance.Amount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ApplyBetOutcome_Win_DeductsBetAndAddsWin()
+    {
+        // Arrange
+        var wallet = new Wallet(Money.Create(10).Value!);
+        var bet = Money.Create(5).Value!;
+        var win = Money.Create(8).Value!;
+        var outcome = new BetOutcome(bet, win);
+
+        // Act
+        var result = wallet.ApplyBetOutcome(outcome);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Balance.Amount.Should().Be(13);
+    }
+
+    [Fact]
+    public void ApplyBetOutcome_Loss_DeductsBetOnly()
+    {
+        // Arrange
+        var wallet = new Wallet(Money.Create(10).Value!);
+        var bet = Money.Create(5).Value!;
+        var win = Money.Create(0).Value!;
+        var outcome = new BetOutcome(bet, win);
+
+        // Act
+        var result = wallet.ApplyBetOutcome(outcome);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Balance.Amount.Should().Be(5);
+    }
+
+    [Fact]
+    public void ApplyBetOutcome_InsufficientFunds_ReturnsError()
+    {
+        // Arrange
+        var wallet = new Wallet(Money.Create(3).Value!);
+        var bet = Money.Create(5).Value!;
+        var win = Money.Create(0).Value!;
+        var outcome = new BetOutcome(bet, win);
+
+        // Act
+        var result = wallet.ApplyBetOutcome(outcome);
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error!.Code.Should().Be("Bet.InsufficientFunds");
+        result.Error!.Message.Should().Be("Insufficient funds for bet. Your current balance is: $3.00");
+        wallet.Balance.Amount.Should().Be(3);
+    }
+
+    [Fact]
+    public void ApplyBetOutcome_ExactBalanceBet_Succeeds()
+    {
+        // Arrange
+        var wallet = new Wallet(Money.Create(5).Value!);
+        var bet = Money.Create(5).Value!;
+        var win = Money.Create(0).Value!;
+        var outcome = new BetOutcome(bet, win);
+
+        // Act
+        var result = wallet.ApplyBetOutcome(outcome);
 
         // Assert
         result.IsSuccess.Should().BeTrue();

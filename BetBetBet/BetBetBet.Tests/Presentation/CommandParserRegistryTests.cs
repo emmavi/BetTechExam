@@ -43,7 +43,7 @@ public class CommandParserRegistryTests
         var registry = new CommandParserRegistry([new ExitCommandParser()]);
 
         // Act
-        var result = registry.Parse("bet 5");
+        var result = registry.Parse("spin 5");
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -76,5 +76,19 @@ public class CommandParserRegistryTests
         // Assert
         result.IsFailure.Should().BeTrue();
         result.Error!.Code.Should().Be(InputErrors.UnknownCommand.Code);
+    }
+
+    [Fact]
+    public void Parse_BetKeywordWithParserRegistered_ReturnsBetCommand()
+    {
+        // Arrange
+        var registry = new CommandParserRegistry([new ExitCommandParser(), new BetCommandParser()]);
+
+        // Act
+        var result = registry.Parse("bet 5");
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Should().BeOfType<BetCommand>();
     }
 }

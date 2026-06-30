@@ -1,5 +1,6 @@
 using BetBetBet.Domain.Common;
 using BetBetBet.Domain.Errors;
+using BetBetBet.Domain.Services;
 using BetBetBet.Domain.ValueObjects;
 
 namespace BetBetBet.Domain.Entities;
@@ -27,5 +28,14 @@ public sealed class Wallet
             return WalletErrors.InsufficientFunds(Balance);
 
         return new Wallet(Balance - amount);
+    }
+
+    public Result<Wallet> ApplyBetOutcome(BetOutcome outcome)
+    {
+        if (outcome.Bet > Balance)
+            return BetErrors.InsufficientFunds(Balance);
+
+        var newBalance = Balance - outcome.Bet + outcome.Win;
+        return new Wallet(newBalance);
     }
 }

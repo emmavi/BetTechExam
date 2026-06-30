@@ -1,7 +1,11 @@
+using System.Globalization;
 using BetBetBet.Application.Commands;
 using BetBetBet.Application.Handlers;
+using BetBetBet.Application.Results;
 using BetBetBet.Domain.Entities;
+using BetBetBet.Domain.Services;
 using BetBetBet.Domain.ValueObjects;
+using BetBetBet.Infra;
 using BetBetBet.Presentation.Parsing;
 
 namespace BetBetBet.Presentation;
@@ -27,7 +31,15 @@ public static class Program
         var wallet = new Wallet(moneyResult.Value);
         console.WriteLine($"Your current balance is: ${wallet.Balance.Amount}");
 
-        var registry = new CommandParserRegistry([new ExitCommandParser(), new DepositCommandParser(), new WithdrawCommandParser()]);
+        var randomProvider = new SystemRandomProvider();
+        var gameEngine = new SlotGameEngine(randomProvider);
+
+        var registry = new CommandParserRegistry([
+            new ExitCommandParser(),
+            new DepositCommandParser(),
+            new WithdrawCommandParser(),
+            new BetCommandParser()
+        ]);
 
         while (true)
         {
@@ -74,7 +86,34 @@ public static class Program
                 if (result.IsSuccess)
                 {
                     wallet = result.Value!;
-                    console.WriteLine($"Your withdrawal of ${withdrawCommand.Amount.Amount:F2} was successful. Your current balance is: ${wallet.Balance.Amount:F2}");
+                    console.WriteLine($"Your withdrawal of ${withdrawCommand.Amount.Amount.ToString("F2", CultureInfo.InvariantCulture)} was successful. Your current balance is: ${wallet.Balance.Amount.ToString("F2", CultureInfo.InvariantCulture)}");
+                }
+                else
+                {
+                    console.WriteLine(result.Error!.Message);
+                }
+
+                continue;
+            }
+
+            if (parseResult.Value is BetCommand betCommand)
+            {
+                var handler = new BetCommandHandler(gameEngine);
+                var result = handler.Handle(wallet, betCommand);
+
+                if (result.IsSuccess)
+                {
+                    var betResult = result.Value!;
+                    wallet = new Wallet(betResult.NewBalance);
+
+                    if (betResult.IsWin)
+                    {
+                        console.WriteLine(BetResultFormatter.FormatWin(betResult));
+                    }
+                    else
+                    {
+                        console.WriteLine(BetResultFormatter.FormatLoss(betResult));
+                    }
                 }
                 else
                 {

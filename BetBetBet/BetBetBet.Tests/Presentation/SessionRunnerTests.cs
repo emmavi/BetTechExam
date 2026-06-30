@@ -42,7 +42,7 @@ public class SessionRunnerTests
     public void Run_UnknownCommand_PrintsUnknownAndContinues()
     {
         // Arrange
-        var console = new FakeConsole("bet 5", "exit");
+        var console = new FakeConsole("spin 5", "exit");
 
         // Act
         Program.Run(console);
@@ -226,6 +226,85 @@ public class SessionRunnerTests
     {
         // Arrange
         var console = new FakeConsole("withdraw abc", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Welcome to BetBetBet!",
+            "Your current balance is: $0",
+            "Please enter a command:",
+            "Could not parse amount.",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().NotContain("Unknown command.");
+    }
+
+    [Fact]
+    public void Run_BetValidCommand_IsNotUnknown()
+    {
+        // Arrange
+        var console = new FakeConsole("deposit 100", "bet 5", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().NotContain("Unknown command.");
+        console.Outputs.Should().Contain(o => o.StartsWith("Congrats - you won") || o.StartsWith("No luck this time"));
+    }
+
+    [Fact]
+    public void Run_BetInsufficientFunds_PrintsErrorAndContinues()
+    {
+        // Arrange
+        var console = new FakeConsole("deposit 3", "bet 5", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Welcome to BetBetBet!",
+            "Your current balance is: $0",
+            "Please enter a command:",
+            "Your deposit of $3 was successful. Your current balance is: $3",
+            "Please enter a command:",
+            "Insufficient funds for bet. Your current balance is: $3.00",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().NotContain("Unknown command.");
+    }
+
+    [Fact]
+    public void Run_BetInvalidAmount_PrintsErrorAndContinues()
+    {
+        // Arrange
+        var console = new FakeConsole("bet abc", "exit");
+
+        // Act
+        Program.Run(console);
+
+        // Assert
+        console.Outputs.Should().ContainInOrder(
+            "Welcome to BetBetBet!",
+            "Your current balance is: $0",
+            "Please enter a command:",
+            "Could not parse amount.",
+            "Please enter a command:",
+            "Thank you for playing! Hope to see you again soon."
+        );
+        console.Outputs.Should().NotContain("Unknown command.");
+    }
+
+    [Fact]
+    public void Run_BetZeroAmount_PrintsErrorAndContinues()
+    {
+        // Arrange
+        var console = new FakeConsole("bet 0", "exit");
 
         // Act
         Program.Run(console);
